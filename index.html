@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plant Schedule — Keep Them Alive</title>
+<style>
+  :root {
+    --bg: #f6f4ee;
+    --card: #ffffff;
+    --ink: #2c322e;
+    --muted: #6b7370;
+    --line: #e3e0d6;
+    --accent: #3e7d54;
+    --accent-soft: #e6f1ea;
+    --overdue: #c0392b;
+    --overdue-soft: #fdecea;
+    --today: #b26a00;
+    --today-soft: #fff3e0;
+    --soon: #8a6d00;
+    --soon-soft: #fdf6d8;
+    --radius: 14px;
+    font-size: 16px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.45;
+  }
+  main { max-width: 68rem; margin: 0 auto; padding: 1rem 1rem 3rem; }
+  h1 { font-size: 1.35rem; margin: 0; }
+  h2 { font-size: 1.05rem; margin: 1.6rem 0 .6rem; }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .75rem;
+    padding: .35rem 0 1rem;
+    border-bottom: 1px solid var(--line);
+  }
+  header .spacer { flex: 1; }
+  .vacation {
+    display: flex; align-items: center; gap: .5rem;
+    background: var(--accent-soft);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: .35rem .75rem;
+    font-size: .9rem;
+  }
+  .vacation input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--accent); }
+  .vacation select {
+    border: 1px solid var(--line); border-radius: 8px; padding: .2rem .35rem; background: #fff; font-size: .9rem;
+  }
+  .vacation-banner {
+    display: none;
+    margin-top: .75rem;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: .6rem .9rem;
+    font-size: .92rem;
+  }
+  .vacation-banner.on { display: block; }
+
+  .due-section { margin-top: 1rem; }
+  .due-list { display: flex; flex-direction: column; gap: .5rem; }
+  .due-item {
+    display: flex; align-items: center; gap: .75rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: .6rem .8rem;
+  }
+  .due-item .emoji { font-size: 1.5rem; }
+  .due-item .what { flex: 1; }
+  .due-item .what .name { font-weight: 600; }
+  .due-item .what .why { color: var(--muted); font-size: .88rem; }
+  .due-item .badge { align-self: center; }
+  .due-item button { white-space: nowrap; }
+  .due-empty { color: var(--muted); font-size: .92rem; }
+
+  .badge {
+    display: inline-block; padding: .1rem .55rem; border-radius: 999px;
+    font-size: .78rem; font-weight: 600; white-space: nowrap;
+  }
+  .badge.overdue { background: var(--overdue-soft); color: var(--overdue); }
+  .badge.today { background: var(--today-soft); color: var(--today); }
+  .badge.soon { background: var(--soon-soft); color: var(--soon); }
+  .badge.later { background: #eef1f5; color: #55606b; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: .8rem;
+  }
+  .plant-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: .85rem;
+    display: flex; flex-direction: column; gap: .6rem;
+  }
+  .plant-card .top { display: flex; gap: .7rem; align-items: center; }
+  .photo {
+    width: 3.2rem; height: 3.2rem; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.9rem;
+    background: var(--accent-soft);
+    border-radius: 12px;
+  }
+  .plant-card .idbox { min-width: 0; }
+  .plant-card .pname { font-weight: 700; overflow-wrap: anywhere; }
+  .plant-card .light {
+    color: var(--muted); font-size: .85rem;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .sched { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
+  .sched .row {
+    display: flex; align-items: baseline; gap: .45rem;
+    padding: .25rem .5rem;
+    border-radius: 8px;
+    background: #f7f8f6;
+  }
+  .sched .row .label { font-weight: 600; min-width: 4.6rem; }
+  .sched .row .last { color: var(--muted); }
+  .sched .row .due { margin-left: auto; font-size: .78rem; }
+  .card-actions {
+    display: flex; flex-wrap: wrap; gap: .35rem; margin-top: auto;
+  }
+
+  button {
+    font: inherit; cursor: pointer;
+    border: 1px solid var(--line);
+    background: #fff; color: var(--ink);
+    border-radius: 10px; padding: .35rem .7rem;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { filter: brightness(1.08); }
+  button.done-tap { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  button.small { padding: .2rem .5rem; font-size: .8rem; }
+  button.danger { color: var(--overdue); border-color: var(--overdue-soft); }
+  button.danger:hover { border-color: var(--overdue); }
+
+  form#plant-form {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: .7rem;
+  }
+  form#plant-form label {
+    display: flex; flex-direction: column; gap: .25rem; font-size: .88rem;
+  }
+  form#plant-form input[type="text"],
+  form#plant-form input[type="number"],
+  form#plant-form input[type="date"],
+  form#plant-form select {
+    font: inherit; padding: .4rem .5rem;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
+  }
+  form#plant-form .emoji-picker { flex-direction: row; flex-wrap: wrap; align-items: center; gap: .35rem; }
+  form#plant-form .emoji-picker input { display: none; }
+  form#plant-form .emoji-picker label.opt {
+    display: flex; align-items: center; justify-content: center;
+    width: 2.1rem; height: 2.1rem; font-size: 1.25rem;
+    border: 1px solid var(--line); border-radius: 8px; cursor: pointer; background: #fff;
+  }
+  form#plant-form .emoji-picker input:checked + label.opt {
+    border-color: var(--accent); background: var(--accent-soft);
+  }
+  form#plant-form .form-actions {
+    grid-column: 1 / -1; display: flex; gap: .5rem; align-items: center;
+  }
+  .hint { color: var(--muted); font-size: .85rem; grid-column: 1 / -1; }
+  .hidden { display: none !important; }
+
+  .links {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: .9rem 1rem; font-size: .92rem;
+  }
+  .links ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+  .links a { color: var(--accent); }
+  footer {
+    margin-top: 2rem; padding: .8rem 0; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: .85rem;
+  }
+  footer strong { color: var(--ink); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🪴 Plant Schedule</h1>
+    <div class="spacer"></div>
+    <label class="vacation" title="Stretch every schedule while you are away">
+      <input type="checkbox" id="vacation-toggle">
+      Vacation mode
+      <select id="vacation-mult" aria-label="Vacation schedule multiplier">
+        <option value="1">×1</option>
+        <option value="1.25" selected>×1.25</option>
+        <option value="1.5">×1.5</option>
+        <option value="2">×2</option>
+        <option value="3">×3</option>
+      </select>
+    </label>
+  </header>
+
+  <div class="vacation-banner" id="vacation-banner">
+    Vacation mode is on: all next-due dates are stretched by the multiplier below your usual
+    intervals. Turn it off when you get home.
+  </div>
+
+  <section class="due-section">
+    <h2>Today</h2>
+    <div class="due-list" id="due-list"></div>
+  </section>
+
+  <section>
+    <h2>Plants</h2>
+    <div class="grid" id="plant-grid"></div>
+    <p><button id="add-plant-btn" class="primary">+ Add plant</button></p>
+
+    <form id="plant-form" class="hidden" autocomplete="off">
+      <h2 style="grid-column:1/-1; margin:0" id="form-title">New plant</h2>
+      <label>Name
+        <input type="text" id="f-name" maxlength="60" placeholder="Pothos in the living room" required>
+      </label>
+      <label class="emoji-picker" style="flex-direction:column">Photo (pick an emoji)
+        <span id="emoji-options"></span>
+      </label>
+      <label>Light notes
+        <input type="text" id="f-light" maxlength="120" placeholder="Bright, indirect; east window">
+      </label>
+      <label style="flex-direction:row; gap:.4rem; align-items:center">
+        <input type="checkbox" id="f-always-water">
+        Needs water whenever topsoil is dry (no set interval)
+      </label>
+      <label>Water every (days)
+        <input type="number" id="f-water-int" min="1" max="3650" value="7">
+      </label>
+      <label>Water — last done (optional)
+        <input type="date" id="f-water-last">
+      </label>
+      <label>Fertilize every (days) — growing season
+        <input type="number" id="f-fert-int" min="1" max="3650" value="30">
+      </label>
+      <label>Fertilize — last done (optional)
+        <input type="date" id="f-fert-last">
+      </label>
+      <label>Repot every (months)
+        <input type="number" id="f-repot-int" min="1" max="120" value="12">
+      </label>
+      <label>Repot — last done (optional)
+        <input type="date" id="f-repot-last">
+      </label>
+      <div class="hint">
+        Leave a "last done" date empty if this chore has never been done since you got the
+        plant — it stays off the today list until you set one.
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="primary" id="save-btn">Save plant</button>
+        <button type="button" id="cancel-btn">Cancel</button>
+        <button type="button" class="danger" id="delete-btn">Delete plant</button>
+      </div>
+    </form>
+  </section>
+
+  <section>
+    <h2>Learn more (education-level care links)</h2>
+    <div class="links">
+      <p>
+        General, beginner-friendly references from public institutions — good for learning
+        what light, water, and soil each plant type generally prefers. These are educational
+        resources only.
+      </p>
+      <ul>
+        <li><a href="https://extension.umn.edu/houseplants" target="_blank" rel="noopener">University of Minnesota Extension — Houseplants</a></li>
+        <li><a href="https://www.missouribotanicalgarden.org/plantfinder/plantfindersearch.aspx" target="_blank" rel="noopener">Missouri Botanical Garden — Plant Finder</a></li>
+        <li><a href="https://www.rhs.org.uk/houseplants" target="_blank" rel="noopener">Royal Horticultural Society — Houseplants</a></li>
+        <li><a href="https://hort.extension.wisc.edu/houseplants/" target="_blank" rel="noopener">University of Wisconsin Extension — Houseplants</a></li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <strong>Plant Schedule</strong> — a local-first scheduler. All data stays in this browser
+    (localStorage); nothing is uploaded. Care intervals are general education-level guidance
+    and a starting point, not a diagnosis: if a plant looks sick, an app or a website can't
+    tell you why — check a university extension guide or a local garden center.
+    <br>© 2026 Asdale Dynamics, LLC · MIT License · <span id="today-note"></span>
+  </footer>
+</main>
+
+<script id="core">
+"use strict";
+(function () {
+  const MS_PER_DAY = 86400000;
+
+  function isLeapYear(year) {
+    return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  }
+
+  function daysInMonth(year, month) {
+    if (month === 1) return isLeapYear(year) ? 29 : 28;
+    return [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month];
+  }
+
+  function parseISO(iso) {
+    const parts = iso.split("-");
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    return new Date(y, m, d);
+  }
+
+  function toISO(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + d;
+  }
+
+  function todayISO() {
+    return toISO(new Date());
+  }
+
+  function validISO(iso) {
+    if (typeof iso !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+    const date = parseISO(iso);
+    return !isNaN(date.getTime()) &&
+      date.getMonth() === parseInt(iso.split("-")[1], 10) - 1 &&
+      date.getDate() === parseInt(iso.split("-")[2], 10);
+  }
+
+  function diffDays(fromISO, toISOstr) {
+    return Math.round((parseISO(toISOstr).getTime() - parseISO(fromISO).getTime()) / MS_PER_DAY);
+  }
+
+  function addDaysISO(iso, n) {
+    const date = parseISO(iso);
+    date.setDate(date.getDate() + n);
+    return toISO(date);
+  }
+
+  function addMonthsISO(iso, n) {
+    const date = parseISO(iso);
+    const day = date.getDate();
+    date.setMonth(date.getMonth() + n);
+    if (date.getDate() !== day) {
+      date.setDate(0);
+    }
+    return toISO(date);
+  }
+
+  function stretchedInterval(interval, unit, multiplier) {
+    const base = Math.max(1, interval);
+    const m = Math.max(0.25, multiplier || 1);
+    if (unit === "months") {
+      return Math.max(1, Math.round(base * m));
+    }
+    return Math.max(1, Math.round(base * m));
+  }
+
+  function nextDueISO(lastISO, interval, unit, multiplier) {
+    if (!validISO(lastISO)) return null;
+    if (unit === "months") {
+      return addMonthsISO(lastISO, stretchedInterval(interval, unit, multiplier));
+    }
+    return addDaysISO(lastISO, stretchedInterval(interval, unit, multiplier));
+  }
+
+  function statusOf(daysLeft) {
+    if (daysLeft < 0) return "overdue";
+    if (daysLeft === 0) return "today";
+    if (daysLeft <= 3) return "soon";
+    return "later";
+  }
+
+  function choreInfo(lastISO, interval, unit, multiplier, todayStr) {
+    if (!lastISO) return null;
+    const baseDue = nextDueISO(lastISO, interval, unit, 1);
+    const due = nextDueISO(lastISO, interval, unit, multiplier);
+    if (!due) return null;
+    const daysLeft = diffDays(todayStr || todayISO(), due);
+    return {
+      due: due,
+      daysLeft: daysLeft,
+      status: statusOf(daysLeft),
+      stretchedFrom: baseDue !== due ? baseDue : null
+    };
+  }
+
+  function neededChores(plant, vacation, todayStr) {
+    const multiplier = vacation && vacation.active ? vacation.multiplier : 1;
+    const today = todayStr || todayISO();
+    const out = [];
+    if (!plant.alwaysWater) {
+      const water = choreInfo(plant.waterLast, plant.waterEvery, "days", multiplier, today);
+      if (water && (water.status === "overdue" || water.status === "today")) {
+        out.push({ chore: "water", label: "Water", info: water });
+      }
+    }
+    const fert = choreInfo(plant.fertLast, plant.fertEvery, "days", multiplier, today);
+    if (fert && (fert.status === "overdue" || fert.status === "today")) {
+      out.push({ chore: "fert", label: "Fertilize", info: fert });
+    }
+    const repot = choreInfo(plant.repotLast, plant.repotEvery, "months", multiplier, today);
+    if (repot && (repot.status === "overdue" || repot.status === "today")) {
+      out.push({ chore: "repot", label: "Repot", info: repot });
+    }
+    out.sort(function (a, b) { return a.info.daysLeft - b.info.daysLeft; });
+    return out;
+  }
+
+  const PlantSched = {
+    MS_PER_DAY: MS_PER_DAY,
+    isLeapYear: isLeapYear,
+    daysInMonth: daysInMonth,
+    parseISO: parseISO,
+    toISO: toISO,
+    todayISO: todayISO,
+    validISO: validISO,
+    diffDays: diffDays,
+    addDaysISO: addDaysISO,
+    addMonthsISO: addMonthsISO,
+    stretchedInterval: stretchedInterval,
+    nextDueISO: nextDueISO,
+    statusOf: statusOf,
+    choreInfo: choreInfo,
+    neededChores: neededChores
+  };
+
+  if (typeof globalThis === "object") {
+    globalThis.PlantSched = PlantSched;
+  }
+})();
+</script>
+
+<script>
+"use strict";
+(function () {
+  const { todayISO, choreInfo, neededChores } = PlantSched;
+  const STORAGE_KEY = "houseplant-scheduler.v1";
+  const EMOJIS = ["🪴", "🌿", "🍃", "🌵", "🌴", "🌸", "🌺", "🌻", "🍀", "🪷", "🎋", "🌾", "🌱", "🪻"];
+  const CHORE_NAMES = { water: "Water", fert: "Fertilize", repot: "Repot" };
+  const UNIT_NAMES = { water: "days", fert: "days", repot: "months" };
+
+  let editingId = null;
+
+  function defaultState() {
+    return { version: 1, vacation: { active: false, multiplier: 1.25 }, plants: [], seeded: false };
+  }
+
+  let state = defaultState();
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.plants)) return false;
+      state = Object.assign(defaultState(), parsed);
+      return true;
+    } catch (err) {
+      console.error("Could not load saved plants", err);
+      return false;
+    }
+  }
+
+  function freshId() {
+    return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  function daysAgoISO(n) {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  function seed() {
+    const id = freshId;
+    state.plants = [
+      {
+        id: id(), name: "Pothos (living room)", emoji: "🌿",
+        light: "Bright, indirect; about 6 ft from the south window.",
+        alwaysWater: false, waterEvery: 7, waterLast: daysAgoISO(9),
+        fertEvery: 30, fertLast: daysAgoISO(20),
+        repotEvery: 24, repotLast: daysAgoISO(400)
+      },
+      {
+        id: id(), name: "Snake plant", emoji: "🎋",
+        light: "Medium light, corner shelf. Water sparingly.",
+        alwaysWater: false, waterEvery: 21, waterLast: daysAgoISO(15),
+        fertEvery: 60, fertLast: daysAgoISO(30),
+        repotEvery: 36, repotLast: daysAgoISO(200)
+      },
+      {
+        id: id(), name: "Desert rose cactus", emoji: "🌵",
+        light: "Full sun, window sill. Let soil dry fully.",
+        alwaysWater: false, waterEvery: 14, waterLast: daysAgoISO(5),
+        fertEvery: 30, fertLast: daysAgoISO(10),
+        repotEvery: 24, repotLast: null
+      }
+    ];
+    state.seeded = true;
+  }
+
+  function findPlant(id) {
+    return state.plants.find(function (p) { return p.id === id; });
+  }
+
+  function $(sel) { return document.querySelector(sel); }
+
+  function esc(text) {
+    const div = document.createElement("div");
+    div.textContent = String(text == null ? "" : text);
+    return div.innerHTML;
+  }
+
+  function fmtDue(info) {
+    if (info.status === "overdue") {
+      const late = -info.daysLeft;
+      return late + (late === 1 ? " day" : " days") + " overdue";
+    }
+    if (info.status === "today") return "due today";
+    if (info.status === "soon") return "in " + info.daysLeft + " day" + (info.daysLeft === 1 ? "" : "s");
+    return "in " + info.daysLeft + " days";
+  }
+
+  function markDone(id, chore) {
+    const plant = findPlant(id);
+    if (!plant) return;
+    const today = todayISO();
+    if (chore === "water") plant.waterLast = today;
+    if (chore === "fert") plant.fertLast = today;
+    if (chore === "repot") plant.repotLast = today;
+    save();
+    render();
+  }
+
+  function renderDueList() {
+    const list = $("#due-list");
+    const vacationMult = state.vacation.active ? state.vacation.multiplier : 1;
+    const items = [];
+    state.plants.forEach(function (plant) {
+      neededChores(plant, state.vacation, todayISO()).forEach(function (c) {
+        items.push({ plant: plant, chore: c.chore, label: c.label, info: c.info });
+      });
+    });
+    items.sort(function (a, b) {
+      return a.info.daysLeft - b.info.daysLeft ||
+        a.plant.name.localeCompare(b.plant.name);
+    });
+
+    if (items.length === 0) {
+      list.innerHTML = '<p class="due-empty">Nothing is due today. Nice — the plants are ' +
+        (state.vacation.active ? "benefiting from vacation mode" : "caught up") + '.</p>';
+      return;
+    }
+
+    list.innerHTML = items.map(function (item) {
+      return '<div class="due-item">' +
+        '<span class="emoji">' + esc(item.plant.emoji) + '</span>' +
+        '<div class="what">' +
+          '<div class="name">' + esc(item.plant.name) + '</div>' +
+          '<div class="why">' + CHORE_NAMES[item.chore] +
+            (item.info.daysLeft < 0
+              ? " was due " + item.info.due
+              : " is due " + item.info.due) +
+          '</div>' +
+        '</div>' +
+        '<span class="badge ' + item.info.status + '">' + fmtDue(item.info) + '</span>' +
+        '<button class="done-tap" data-done="' + esc(item.plant.id) + '" data-chore="' + item.chore + '">' +
+          'Done ✓' +
+        '</button>' +
+      '</div>';
+    }).join("");
+    void vacationMult;
+  }
+
+  function renderPlantCard(plant) {
+    const mult = state.vacation.active ? state.vacation.multiplier : 1;
+    const chores = [
+      { key: "water", alwaysSkip: plant.alwaysWater, last: plant.waterLast, every: plant.waterEvery, unit: "days", label: "Water" },
+      { key: "fert", alwaysSkip: false, last: plant.fertLast, every: plant.fertEvery, unit: "days", label: "Fertilize" },
+      { key: "repot", alwaysSkip: false, last: plant.repotLast, every: plant.repotEvery, unit: "months", label: "Repot" }
+    ];
+    void mult;
+
+    const rows = chores.map(function (c) {
+      if (c.alwaysSkip) {
+        return '<div class="row"><span class="label">' + c.label + '</span>' +
+          '<span class="last">check soil — no fixed schedule</span></div>';
+      }
+      const info = choreInfo(c.last, c.every, c.unit,
+        state.vacation.active ? state.vacation.multiplier : 1, todayISO());
+      const lastTxt = c.last ? c.last : "—";
+      if (!info) {
+        return '<div class="row"><span class="label">' + c.label + '</span>' +
+          '<span class="last">every ' + c.every + " " + (c.unit === "days" ? "day" + (c.every === 1 ? "" : "s") : "month" + (c.every === 1 ? "" : "s")) +
+          ' · last: ' + lastTxt + '</span>' +
+          '<span class="due"><span class="badge later">no date yet</span></span></div>';
+      }
+      return '<div class="row"><span class="label">' + c.label + '</span>' +
+        '<span class="last">every ' + c.every + " " + (c.unit === "days" ? "day" + (c.every === 1 ? "" : "s") : "month" + (c.every === 1 ? "" : "s")) +
+        ' · last: ' + lastTxt + "</span>" +
+        '<span class="due"><span class="badge ' + info.status + '">' + fmtDue(info) + "</span></span></div>";
+    }).join("");
+
+    return '<article class="plant-card" data-id="' + esc(plant.id) + '">' +
+      '<div class="top">' +
+        '<div class="photo">' + esc(plant.emoji) + '</div>' +
+        '<div class="idbox">' +
+          '<div class="pname">' + esc(plant.name) + '</div>' +
+          '<div class="light">' + (plant.light ? esc(plant.light) : "No light notes yet") + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="sched">' + rows + '</div>' +
+      '<div class="card-actions">' +
+        '<button class="small done-tap" data-done="' + esc(plant.id) + '" data-chore="water" title="Watered today">Water ✓</button>' +
+        '<button class="small done-tap" data-done="' + esc(plant.id) + '" data-chore="fert" title="Fertilized today">Feed ✓</button>' +
+        '<button class="small done-tap" data-done="' + esc(plant.id) + '" data-chore="repot" title="Repotted today">Repot ✓</button>' +
+        '<button class="small" data-edit="' + esc(plant.id) + '">Edit</button>' +
+      '</div>' +
+    '</article>';
+  }
+
+  function renderGrid() {
+    const grid = $("#plant-grid");
+    if (state.plants.length === 0) {
+      grid.innerHTML = '<p class="due-empty">No plants yet. Add your first plant to start tracking.</p>';
+      return;
+    }
+    grid.innerHTML = state.plants.map(renderPlantCard).join("");
+  }
+
+  function renderVacation() {
+    $("#vacation-toggle").checked = state.vacation.active;
+    $("#vacation-mult").value = String(state.vacation.multiplier);
+    $("#vacation-banner").classList.toggle("on", state.vacation.active);
+  }
+
+  function render() {
+    renderVacation();
+    renderDueList();
+    renderGrid();
+  }
+
+  function getSelectedEmoji() {
+    const checked = document.querySelector('#emoji-options input:checked');
+    return checked ? checked.value : EMOJIS[0];
+  }
+
+  function renderEmojiOptions(selected) {
+    const box = $("#emoji-options");
+    box.innerHTML = EMOJIS.map(function (e) {
+      const id = "emo-" + EMOJIS.indexOf(e);
+      const isSel = (selected || EMOJIS[0]) === e ? " checked" : "";
+      return '<input type="radio" name="plant-emoji" value="' + e + '" id="' + id + '"' + isSel + '>' +
+        '<label class="opt" for="' + id + '" title="Pick a placeholder">' + e + '</label>';
+    }).join("");
+  }
+
+  function openForm(editId) {
+    editingId = editId || null;
+    const form = $("#plant-form");
+    $("#delete-btn").classList.toggle("hidden", !editingId);
+    $("#form-title").textContent = editingId ? "Edit plant" : "New plant";
+    form.reset();
+    if (editingId) {
+      const p = findPlant(editingId);
+      if (!p) return;
+      $("#f-name").value = p.name;
+      $("#f-light").value = p.light || "";
+      $("#f-always-water").checked = !!p.alwaysWater;
+      $("#f-water-int").value = p.waterEvery;
+      $("#f-water-last").value = p.waterLast || "";
+      $("#f-fert-int").value = p.fertEvery;
+      $("#f-fert-last").value = p.fertLast || "";
+      $("#f-repot-int").value = p.repotEvery;
+      $("#f-repot-last").value = p.repotLast || "";
+    } else {
+      $("#f-water-int").value = 7;
+      $("#f-fert-int").value = 30;
+      $("#f-repot-int").value = 12;
+    }
+    renderEmojiOptions(editingId ? findPlant(editingId).emoji : null);
+    form.classList.remove("hidden");
+    $("#f-name").focus();
+  }
+
+  function closeForm() {
+    $("#plant-form").classList.add("hidden");
+    editingId = null;
+  }
+
+  function saveForm(event) {
+    event.preventDefault();
+    const name = $("#f-name").value.trim();
+    if (!name) return;
+    const num = function (sel, def) {
+      const v = parseInt($(sel).value, 10);
+      return (!isNaN(v) && v > 0) ? v : def;
+    };
+    const dateOrNull = function (sel) {
+      const v = $(sel).value;
+      return PlantSched.validISO(v) ? v : null;
+    };
+    const fields = {
+      name: name,
+      emoji: getSelectedEmoji(),
+      light: $("#f-light").value.trim(),
+      alwaysWater: $("#f-always-water").checked,
+      waterEvery: num("#f-water-int", 7),
+      waterLast: dateOrNull("#f-water-last"),
+      fertEvery: num("#f-fert-int", 30),
+      fertLast: dateOrNull("#f-fert-last"),
+      repotEvery: num("#f-repot-int", 12),
+      repotLast: dateOrNull("#f-repot-last")
+    };
+    if (editingId) {
+      const p = findPlant(editingId);
+      if (p) Object.assign(p, fields);
+      editingId = null;
+    } else {
+      state.plants.push(Object.assign({ id: freshId() }, fields));
+    }
+    save();
+    closeForm();
+    render();
+  }
+
+  function deletePlant() {
+    if (!editingId) return;
+    const p = findPlant(editingId);
+    if (!p) return;
+    const msg = "Delete \"" + p.name + "\"? This cannot be undone.";
+    if (!window.confirm(msg)) return;
+    state.plants = state.plants.filter(function (x) { return x.id !== editingId; });
+    editingId = null;
+    save();
+    closeForm();
+    render();
+  }
+
+  function wireEvents() {
+    $("#add-plant-btn").addEventListener("click", function () { openForm(null); });
+    $("#cancel-btn").addEventListener("click", closeForm);
+    $("#delete-btn").addEventListener("click", deletePlant);
+    $("#plant-form").addEventListener("submit", saveForm);
+
+    $("#vacation-toggle").addEventListener("change", function (e) {
+      state.vacation.active = e.target.checked;
+      save();
+      render();
+    });
+    $("#vacation-mult").addEventListener("change", function (e) {
+      const v = parseFloat(e.target.value);
+      state.vacation.multiplier = (!isNaN(v) && v >= 1) ? v : 1.25;
+      save();
+      render();
+    });
+
+    document.addEventListener("click", function (e) {
+      const doneBtn = e.target.closest("[data-done]");
+      if (doneBtn) {
+        markDone(doneBtn.getAttribute("data-done"), doneBtn.getAttribute("data-chore"));
+        return;
+      }
+      const editBtn = e.target.closest("[data-edit]");
+      if (editBtn) {
+        openForm(editBtn.getAttribute("data-edit"));
+      }
+    });
+  }
+
+  load();
+  if (!state.seeded && state.plants.length === 0) seed();
+  save();
+  wireEvents();
+  render();
+
+  const note = $("#today-note");
+  if (note) note.textContent = "Today: " + todayISO();
+})();
+</script>
+</body>
+</html>
